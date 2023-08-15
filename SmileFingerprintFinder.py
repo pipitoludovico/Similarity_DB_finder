@@ -9,7 +9,7 @@ from Fingerprint_finder.Finder import Finder
 from rdkit.Chem import PandasTools
 
 PARSER = ArgParser()
-FingerPrint, Database, Sort, separator, filterColumn, filterOperator, filterCriterium = PARSER.ParseArgs()
+FingerPrint, Database, Sort, separator, filterColumn, filterOperator, filterCriterium, output, sliceStart, sliceEnd = PARSER.ParseArgs()
 
 
 def main():
@@ -59,10 +59,11 @@ def main():
         df_list.append(filteredResult)
 
     df2 = pd.concat(df_list)
+    df2 = df2.iloc[sliceStart:sliceEnd]
     df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
     ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
     try:
-        PandasTools.SaveXlsxFromFrame(ultimateDF.head(100), f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx', molCol='ROMol')
+        PandasTools.SaveXlsxFromFrame(ultimateDF.head(output), f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx', molCol='ROMol')
     except:
         print("No data matching your selection. Empty dataframe.")
 

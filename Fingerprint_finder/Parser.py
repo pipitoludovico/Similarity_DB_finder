@@ -32,7 +32,8 @@ class ArgParser:
                         help="Stop the current process.")
         ap.add_argument("-f", '--filter', nargs='*', required=False,
                         help='Choose between "molecular_weight", "formal_charge" or  "similarity" and add a criteria: eg. -f "molecular_weight >= 250" or -f "formal_charge <= 0"  or -f "similarity >= 70" to filter your results')
-
+        ap.add_argument("-o", '--output', type=int, required=False, help='choose how many data you want to display in the results [Default = 100]')
+        ap.add_argument("-sl", '--slice', nargs='*', required=False, help='choose a slice of your database to be used for processing. E.g. -sl 100:-1 [Default = 0 :-1]')
         args = ap.parse_args()
 
         if args.kill is True:
@@ -48,6 +49,17 @@ class ArgParser:
         if 't' in str(args.separator):
             args.separator = "\t"
 
+        output = 100
+
+        if args.output:
+            output = int(args.output)
+
+        if args.slice is None:
+            sliceStart, sliceEnd = 0, -1
+        else:
+            slicer = str(args.slice[0]).split(":")
+            sliceStart, sliceEnd = int(slicer[0]), int(slicer[1])
+
         if args.filter is None:
             filters = ['similarity', ">=", "75"]
             Column, Operator, Criterium = filters[0], filters[1], float(filters[2])/100
@@ -62,4 +74,4 @@ class ArgParser:
                 else:
                     Column, Operator, Criterium = filters[0], filters[1], float(filters[2])
         if args.fingerprint is not None and args.database is not None and args.separator is not None:
-            return args.fingerprint, args.database, sort, args.separator, Column, Operator, Criterium
+            return args.fingerprint, args.database, sort, args.separator, Column, Operator, Criterium, output, sliceStart, sliceEnd
