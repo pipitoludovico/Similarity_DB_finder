@@ -5,7 +5,7 @@ import signal
 
 class ArgParser:
     def __init__(self):
-        getpid()
+        self.GetPID()
         self.ParseArgs()
 
     @staticmethod
@@ -34,10 +34,10 @@ class ArgParser:
                         help='Choose between "molecular_weight", "formal_charge" or  "similarity" and add a criteria: eg. -f "molecular_weight >= 250" or -f "formal_charge <= 0"  or -f "similarity >= 70" to filter your results')
         ap.add_argument("-o", '--output', type=int, required=False, help='choose how many data you want to display in the results [Default = 100]')
         ap.add_argument("-sl", '--slice', nargs='*', required=False, help='choose a slice of your database to be used for processing. E.g. -sl 100:-1 [Default = 0 :-1]')
-        args = ap.parse_args()
 
         if args.kill is True:
             from os import system, kill
+            ArgParser().GetPID()
             system('val=$(<.mypid ) && kill -9 $val')
             kill(getpid(), signal.SIGKILL)
 
