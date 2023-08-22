@@ -17,7 +17,6 @@ class ArgParser:
 
     @staticmethod
     def ParseArgs():
-        Column, Operator, Criterium = None, None, None
         allowedSelections = ('molecular_weight', 'formal_charge', 'similarity')
         ap = argparse.ArgumentParser()
         ap.add_argument("-fp", '--fingerprint', required=True,
@@ -26,14 +25,16 @@ class ArgParser:
                         help=' use -db to input the SMILES database you want to explore')
         ap.add_argument('-so', '--sort', required=False, default="False",
                         help=' use -so True if you want your results to be sorted by ascending similarity, False for descending fashion')
-        ap.add_argument('-se', '--separator', required=False, type=str, default=" ",
-                        help=' use -se to define the separator of your database [Default = " "]')
         ap.add_argument("-k", '--kill', required=False, action='store_true', default=False,
                         help="Stop the current process.")
-        ap.add_argument("-f", '--filter', nargs='*', required=False,
-                        help='Choose between "molecular_weight", "formal_charge" or  "similarity" and add a criteria: eg. -f "molecular_weight >= 250" or -f "formal_charge <= 0"  or -f "similarity >= 70" to filter your results')
-        ap.add_argument("-o", '--output', type=int, required=False, help='choose how many data you want to display in the results [Default = 100]')
-        ap.add_argument("-sl", '--slice', nargs='*', required=False, help='choose a slice of your database to be used for processing. E.g. -sl 100:-1 [Default = 0 :-1]')
+        ap.add_argument('-f', '--filter', action='append', required=False, help='Set filters for your dataframe between between: molecular_weight, formal_charge, similarity. E.g.: -f "molecular_weight <= 455" -f "formal_charge <= 0"...')
+        ap.add_argument("-o", '--output', type=int, required=False,
+                        help='choose how many data you want to display in the results [Default = 100]')
+        ap.add_argument("-sl", '--slice', nargs='*', required=False,
+                        help='choose a slice of your database to be used for processing. E.g. -sl 100:-1 [Default = 0 :-1]')
+        ap.add_argument('-ex', '--exclude', action='append', required=False, help='Exclude all rows containing the described smiles. E.g.: -ex "O-" -ex "S(=O)"')
+        ap.add_argument('-in', '--include', action='append', required=False, help='Include only the rows containing the described smiles. E.g.: -in "O-" -in "S(=O)"')
+        args = ap.parse_args()
 
         if args.kill is True:
             from os import system, kill
@@ -45,9 +46,6 @@ class ArgParser:
             sort = True
         else:
             sort = False
-
-        if 't' in str(args.separator):
-            args.separator = "\t"
 
         output = 100
 
@@ -61,17 +59,6 @@ class ArgParser:
             sliceStart, sliceEnd = int(slicer[0]), int(slicer[1])
 
         if args.filter is None:
-            filters = ['similarity', ">=", "75"]
-            Column, Operator, Criterium = filters[0], filters[1], float(filters[2])/100
-        else:
-            filterArgs = args.filter[0]
-            filters = (filterArgs.split(" "))
-            if filters[0] not in allowedSelections:
-                raise ValueError("Please choose between the following: ", allowedSelections)
-            else:
-                if str(filters[0]).startswith('simi'):
-                    Column, Operator, Criterium = filters[0], filters[1], float(filters[2])/100
-                else:
-                    Column, Operator, Criterium = filters[0], filters[1], float(filters[2])
-        if args.fingerprint is not None and args.database is not None and args.separator is not None:
-            return args.fingerprint, args.database, sort, args.separator, Column, Operator, Criterium, output, sliceStart, sliceEnd
+            args.filter = ["similarity >= 75"]
+
+        return args.fingerprint, args.database, sort, args.filter, output, sliceStart, sliceEnd, args.exclude, args.include
