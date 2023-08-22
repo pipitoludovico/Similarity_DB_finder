@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 from multiprocessing import Pool, Manager
 import pandas as pd
 from Fingerprint_finder.Parser import ArgParser
@@ -99,8 +98,7 @@ def main():
                                           f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx',
                                           molCol='ROMol')
         except:
-            print("No data matching your selection. Empty dataframe.")
-            exit()
+            raise Exception("DataFrame must not be empty")
     except pd.errors.ParserError:
         print("Couldn't parse your database. Check if your db has the id and smiles columns")
 
