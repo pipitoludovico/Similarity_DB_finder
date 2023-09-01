@@ -38,6 +38,5 @@ class Parser:
             for df in pd.read_csv(data, sep=" ", chunksize=100000, low_memory=False):
                 df_list.append(df)
 
-
     def getBigDf(self):
         return self.df2

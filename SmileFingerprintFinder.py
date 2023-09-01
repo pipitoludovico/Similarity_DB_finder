@@ -9,68 +9,78 @@ from Fingerprint_finder.Fingerprint import Read_fingerprint
 from Fingerprint_finder.Finder import Finder
 from rdkit.Chem import PandasTools
 
+import time
 PARSER = ArgParser()
 FingerPrint, Database, Sort, filters, output, sliceStart, sliceEnd, excludes, includes = PARSER.ParseArgs()
 
 
 def ProcessDF(df, qq, p_FPmol):
-    print(df.head())
     print("...")
-    smileCol = [col for col in df.columns if col.lower().startswith('smi')]
-    idCol = [col for col in df.columns if "id" in col.lower()]
-    initialSmiles = df[smileCol[0]]
-    idColName = idCol[0]
-    cleaner = SmilesCleaner(initialSmiles)
-    canonicalSmiles = cleaner.getCanonicalSmiles()
-    df['CanonicalSmiles'] = canonicalSmiles
-    try:
-        filtered = Filter(df, idColName)
-    except Exception as e:
-        print(e)
-        print(
-            "Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
-        exit()
-    filteredDF = filtered.getFiltered()
-    print("Adding molecular descriptors: Weight and Charge.")
-    dfWithDesc = FetchDescriptors(filteredDF)
-    dfWithDesc.CreateDescriptors()
-    df = dfWithDesc.GetDFwithDescriptors()
-    finaldf = Finder(p_FPmol, df)
-    result = finaldf.getDFwithFP()  # ritorna un dataframe con i descrittori molecolari
-    result.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
     filterQuery = None
-    cumulative_result = result.copy()
+    print("Applying filters...")
     if excludes is not None:
         for ex_string in excludes:
-            cumulative_result = cumulative_result[~cumulative_result['CanonicalSmiles'].str.contains(ex_string)]
+            if ex_string == '+':
+                ex_string = '\\+'
+            df = df[~df['smiles'].str.contains(ex_string)]
             print("\nAfter exclusion:")
-            print(cumulative_result.shape)
-
+            print(df.shape)
     if includes is not None:
         for in_string in includes:
-            cumulative_result = cumulative_result[cumulative_result['CanonicalSmiles'].str.contains(in_string)]
+            df = df[df['smiles'].str.contains(in_string)]
             print("\nAfter inclusion:")
-            print(cumulative_result.shape)
+            print(df.shape)
+    df2 = df.copy()
+    del df
+    if df2.shape[0] != 0:
+        smileCol = [col for col in df2.columns if col.lower().startswith('smi')]
+        idCol = [col for col in df2.columns if "id" in col.lower()]
+        initialSmiles = df2[smileCol[0]]
+        idColName = idCol[0]
+        cleaner = SmilesCleaner(initialSmiles)
+        canonicalSmiles = cleaner.getCanonicalSmiles()
+        df2.drop(columns=['smiles'])
+        df2['CanonicalSmiles'] = canonicalSmiles
 
-    for _f in filters:
-        _filter = _f.split()
-        if str(_filter[0]).startswith('simi'):
-            column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
-        else:
-            column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
+        try:
+            filtered = Filter(df2, idColName)
+        except Exception as e:
+            print(e)
+            print("Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
+            exit()
+        filteredDF = filtered.getFiltered()
+        print("Adding molecular descriptors: Weight and Charge.")
+        dfWithDesc = FetchDescriptors(filteredDF)
+        print("Creating descriptors...")
+        dfWithDesc.CreateDescriptors()
+        df_wd = dfWithDesc.GetDFwithDescriptors()
+        finaldf = Finder(p_FPmol, df_wd)
+        result = finaldf.getDFwithFP()
+        result2 = None
+        for _f in filters:
+            _filter = _f.split()
+            if str(_filter[0]).startswith('simi'):
+                column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
+            elif str(_filter[0]).startswith('for'):
+                column, operator, criterium = _filter[0], _filter[1], int(_filter[2])
+            else:
+                column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
 
-        if operator == '==' or operator == "=":
-            filterQuery = f"{column} == {criterium}"
-        if operator == '>=':
-            filterQuery = f"{column} >= {criterium}"
-        if operator == '<=':
-            filterQuery = f"{column} <= {criterium}"
-        if operator == '<':
-            filterQuery = f"{column} < {criterium}"
-        if operator == '>':
-            filterQuery = f"{column} > {criterium}"
-        cumulative_result = cumulative_result.query(filterQuery)
-    qq.put(cumulative_result)
+            if operator == '==' or operator == "=":
+                filterQuery = f"{column} == {criterium}"
+            if operator == '>=':
+                filterQuery = f"{column} >= {criterium}"
+            if operator == '<=':
+                filterQuery = f"{column} <= {criterium}"
+            if operator == '<':
+                filterQuery = f"{column} < {criterium}"
+            if operator == '>':
+                filterQuery = f"{column} > {criterium}"
+            result2 = result.copy().query(filterQuery)
+        result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+        qq.put(result2)
+    else:
+        qq.put(pd.DataFrame())
 
 
 def main():
@@ -81,19 +91,24 @@ def main():
         manager = Manager()
         q = manager.Queue()
         results = []
+        batch = 0
         with Pool() as p:
-            for df in pd.read_csv(Database, sep=None, chunksize=1000000, engine='python'):
+            for df in pd.read_csv(Database, sep=None, chunksize=100000, engine='python'):
                 results.append(p.apply_async(ProcessDF, args=(df, q, FPmol,)))
+            for result in results:
+                result.wait()
                 df_list.append(q.get())
-        p.join()
-        p.close()
-        p.terminate()
-        df2 = pd.concat(df_list)
+                print("Batch #: ", batch, " completed.")
+                batch += 1
+            p.close()
+            p.terminate()
+            p.join()
+
+        df2 = pd.concat(_df for _df in df_list if len(_df) != 0)
         df2 = df2.iloc[sliceStart:sliceEnd]
         df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
         ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
         try:
-            print(ultimateDF.shape)
             PandasTools.SaveXlsxFromFrame(ultimateDF.head(output),
                                           f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx',
                                           molCol='ROMol')
@@ -104,4 +119,7 @@ def main():
 
 
 if __name__ == '__main__':
+    start = time.perf_counter()
     main()
+    finish = time.perf_counter()
+    print("Filtering completed in:", (finish - start))

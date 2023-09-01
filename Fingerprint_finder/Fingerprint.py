@@ -16,4 +16,5 @@ class Read_fingerprint:
         self.addH = Chem.AddHs(self.no_H)
         AllChem.Compute2DCoords(self.addH)
         AllChem.MMFFOptimizeMolecule(self.addH)
+        print("done!")
         return self.addH
