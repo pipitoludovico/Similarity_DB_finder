@@ -10,6 +10,7 @@ from Fingerprint_finder.Finder import Finder
 from rdkit.Chem import PandasTools
 
 import time
+
 PARSER = ArgParser()
 FingerPrint, Database, Sort, filters, output, sliceStart, sliceEnd, excludes, includes = PARSER.ParseArgs()
 
@@ -46,18 +47,20 @@ def ProcessDF(df, qq, p_FPmol):
             filtered = Filter(df2, idColName)
         except Exception as e:
             print(e)
-            print("Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
+            print(
+                "Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
             exit()
         filteredDF = filtered.getFiltered()
         print("Adding molecular descriptors: Weight and Charge.")
-        dfWithDesc = FetchDescriptors(filteredDF)
+        dfWithDesc = FetchDescriptors(filteredDF, excludes)
         print("Creating descriptors...")
         dfWithDesc.CreateDescriptors()
         df_wd = dfWithDesc.GetDFwithDescriptors()
         finaldf = Finder(p_FPmol, df_wd)
         result = finaldf.getDFwithFP()
-        result2 = None
+        result2 = result.copy()
         for _f in filters:
+            print("Filtering:", _f)
             _filter = _f.split()
             if str(_filter[0]).startswith('simi'):
                 column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
@@ -76,8 +79,9 @@ def ProcessDF(df, qq, p_FPmol):
                 filterQuery = f"{column} < {criterium}"
             if operator == '>':
                 filterQuery = f"{column} > {criterium}"
-            result2 = result.copy().query(filterQuery)
+            result2 = result2.copy().query(filterQuery)
         result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+        print(result2.head())
         qq.put(result2)
     else:
         qq.put(pd.DataFrame())
@@ -108,10 +112,14 @@ def main():
         df2 = df2.iloc[sliceStart:sliceEnd]
         df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
         ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
+        UltimateIDCol = [uCol for uCol in ultimateDF.columns if "id" in uCol.lower()][0]
+
         try:
             PandasTools.SaveXlsxFromFrame(ultimateDF.head(output),
                                           f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx',
                                           molCol='ROMol')
+            dfCSV = pd.DataFrame({'id': ultimateDF[UltimateIDCol], 'smiles': ultimateDF['CanonicalSmiles']})
+            dfCSV.head(output).to_csv(f'{FingerPrint.replace(".pdb", "")}_{Database}', index=False)
         except:
             raise Exception("DataFrame must not be empty")
     except pd.errors.ParserError:
