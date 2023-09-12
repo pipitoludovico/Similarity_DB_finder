@@ -4,6 +4,7 @@ from rdkit import Chem
 from rdkit.Chem import Descriptors, PandasTools, Fragments, AllChem, Descriptors3D
 from rdkit import RDLogger
 import pandas as pd
+from tqdm import tqdm
 
 RDLogger.DisableLog('rdApp.*')
 
@@ -74,9 +75,28 @@ class FetchDescriptors:
         return descriptors
 
     def CreateDescriptors(self):
-        descriptors = self.dataframe['CanonicalSmiles'].apply(self.calculate_molecular_descriptors)
-        descriptors = descriptors.dropna()
-        descriptors_df = pd.DataFrame(descriptors.tolist())
+        # Calcola il numero totale di iterazioni
+        total_iterations = len(self.dataframe['CanonicalSmiles'])
+
+        # Crea una barra di avanzamento
+        progress_bar = tqdm(total=total_iterations, desc="Calculating descriptors...", unit="descriptor")
+
+        descriptors = []
+
+        for smiles in self.dataframe['CanonicalSmiles']:
+            descriptor = self.calculate_molecular_descriptors(smiles)
+            if descriptor is not None:
+                descriptors.append(descriptor)
+            # Aggiorna la barra di avanzamento
+            progress_bar.update(1)
+
+        # Chiudi la barra di avanzamento
+        progress_bar.close()
+
+        # Crea il DataFrame dai descrittori
+        descriptors_df = pd.DataFrame(descriptors)
+
+        # Unisci il DataFrame dei descrittori con il DataFrame originale
         self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
 
     def GetDFwithDescriptors(self):
