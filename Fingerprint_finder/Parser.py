@@ -27,7 +27,7 @@ class ArgParser:
                         help=' use -so True if you want your results to be sorted by ascending similarity, False for descending fashion')
         ap.add_argument("-k", '--kill', required=False, action='store_true', default=False,
                         help="Stop the current process.")
-        ap.add_argument('-f', '--filter', action='append', required=False, help='Set filters for your dataframe between between: molecular_weight, formal_charge, similarity. E.g.: -f "molecular_weight <= 455" -f "formal_charge <= 0"...')
+        ap.add_argument('-f', '--filter', action='append', required=False, help='Set filters for your dataframe between between: molecular_weight, formal_charge, similarity etc... E.g.: -f "molecular_weight <= 455" -f "formal_charge <= 0"...')
         ap.add_argument("-o", '--output', type=int, required=False,
                         help='choose how many data you want to display in the results [Default = 100]')
         ap.add_argument("-sl", '--slice', nargs='*', required=False,
