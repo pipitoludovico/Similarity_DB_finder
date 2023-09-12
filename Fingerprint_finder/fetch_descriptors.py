@@ -76,7 +76,7 @@ class FetchDescriptors:
     def CreateDescriptors(self):
         descriptors = self.dataframe['CanonicalSmiles'].apply(self.calculate_molecular_descriptors)
         descriptors = descriptors.dropna()
-        descriptors_df = pd.DataFrame.from_records(descriptors)
+        descriptors_df = pd.DataFrame(descriptors.tolist())
         self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
 
     def GetDFwithDescriptors(self):

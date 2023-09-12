@@ -24,7 +24,7 @@ def ProcessDF(df, qq, p_FPmol):
             if ex_string == '+':
                 ex_string = '\\+'
             df = df[~df['smiles'].str.contains(ex_string)]
-            print("\nAfter exclusion:")
+            print("\nAfter excluding: ", ex_string)
             print(df.shape)
     if includes is not None:
         for in_string in includes:
@@ -51,9 +51,9 @@ def ProcessDF(df, qq, p_FPmol):
                 "Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
             exit()
         filteredDF = filtered.getFiltered()
-        print("Adding molecular descriptors: Weight and Charge.")
+        print("\nAdding molecular descriptors...")
         dfWithDesc = FetchDescriptors(filteredDF, excludes)
-        print("Creating descriptors...")
+        print("\nCreating descriptors...")
         dfWithDesc.CreateDescriptors()
         print("OK TEST")
         df_wd = dfWithDesc.GetDFwithDescriptors()
