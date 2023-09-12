@@ -55,33 +55,38 @@ def ProcessDF(df, qq, p_FPmol):
         dfWithDesc = FetchDescriptors(filteredDF, excludes)
         print("Creating descriptors...")
         dfWithDesc.CreateDescriptors()
+        print("OK TEST")
         df_wd = dfWithDesc.GetDFwithDescriptors()
         finaldf = Finder(p_FPmol, df_wd)
         result = finaldf.getDFwithFP()
-        result2 = result.copy()
-        for _f in filters:
-            print("Filtering:", _f)
-            _filter = _f.split()
-            if str(_filter[0]).startswith('simi'):
-                column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
-            elif str(_filter[0]).startswith('for'):
-                column, operator, criterium = _filter[0], _filter[1], int(_filter[2])
-            else:
-                column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
 
-            if operator == '==' or operator == "=":
-                filterQuery = f"{column} == {criterium}"
-            if operator == '>=':
-                filterQuery = f"{column} >= {criterium}"
-            if operator == '<=':
-                filterQuery = f"{column} <= {criterium}"
-            if operator == '<':
-                filterQuery = f"{column} < {criterium}"
-            if operator == '>':
-                filterQuery = f"{column} > {criterium}"
-            result2 = result2.copy().query(filterQuery)
-        result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+        result2 = result.copy()
+        if len(filters) != 0:
+            for _f in filters:
+                print("Filtering:", _f)
+                _filter = _f.split()
+                if str(_filter[0]).startswith('simi'):
+                    column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
+                elif str(_filter[0]).startswith('for'):
+                    column, operator, criterium = _filter[0], _filter[1], int(_filter[2])
+                else:
+                    column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
+
+                if operator == '==' or operator == "=":
+                    filterQuery = f"{column} == {criterium}"
+                if operator == '>=':
+                    filterQuery = f"{column} >= {criterium}"
+                if operator == '<=':
+                    filterQuery = f"{column} <= {criterium}"
+                if operator == '<':
+                    filterQuery = f"{column} < {criterium}"
+                if operator == '>':
+                    filterQuery = f"{column} > {criterium}"
+                result2 = result2.copy().query(filterQuery)
+            result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+        print("\nAdding filtered dataframe to queue:")
         print(result2.head())
+        print('\n')
         qq.put(result2)
     else:
         qq.put(pd.DataFrame())
@@ -109,9 +114,11 @@ def main():
             p.join()
 
         df2 = pd.concat(_df for _df in df_list if len(_df) != 0)
-        df2 = df2.iloc[sliceStart:sliceEnd]
         df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+
+        print("\nTotal number of compounds found: ", df2.shape[0])
         ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
+        ultimateDF = ultimateDF.iloc[sliceStart:sliceEnd]
         UltimateIDCol = [uCol for uCol in ultimateDF.columns if "id" in uCol.lower()][0]
 
         try:
