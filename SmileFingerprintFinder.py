@@ -55,8 +55,9 @@ def ProcessDF(df, qq, p_FPmol):
         dfWithDesc = FetchDescriptors(filteredDF, excludes)
         print("\nCreating descriptors...")
         dfWithDesc.CreateDescriptors()
-        print("OK TEST")
         df_wd = dfWithDesc.GetDFwithDescriptors()
+        print("OK TEST")
+        print(df_wd.head())
         finaldf = Finder(p_FPmol, df_wd)
         result = finaldf.getDFwithFP()
 
@@ -102,7 +103,7 @@ def main():
         results = []
         batch = 0
         with Pool() as p:
-            for df in pd.read_csv(Database, sep=None, chunksize=100000, engine='python'):
+            for df in pd.read_csv(Database, sep=None, chunksize=100, engine='python'):
                 results.append(p.apply_async(ProcessDF, args=(df, q, FPmol,)))
             for result in results:
                 result.wait()

@@ -1,12 +1,9 @@
 import traceback
-
 from rdkit import Chem
-from rdkit.Chem import Descriptors, PandasTools, Fragments, AllChem, Descriptors3D
-from rdkit import RDLogger
+from rdkit.Chem import PandasTools
+
 import pandas as pd
 from tqdm import tqdm
-
-RDLogger.DisableLog('rdApp.*')
 
 
 class FetchDescriptors:
@@ -18,6 +15,10 @@ class FetchDescriptors:
 
     @staticmethod
     def calculate_molecular_descriptors(smiles):
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors, Fragments, AllChem, Descriptors3D
+        from rdkit import RDLogger
+        RDLogger.DisableLog('rdApp.*')
         public_method_names = [method for method in dir(Descriptors3D) if callable(getattr(Descriptors3D, method)) if
                                not method.startswith('_')]
         descriptors = {}
@@ -75,28 +76,21 @@ class FetchDescriptors:
         return descriptors
 
     def CreateDescriptors(self):
-        # Calcola il numero totale di iterazioni
-        total_iterations = len(self.dataframe['CanonicalSmiles'])
-
-        # Crea una barra di avanzamento
-        progress_bar = tqdm(total=total_iterations, desc="Calculating descriptors...", unit="descriptor")
-
         descriptors = []
+        rows_to_remove = []
 
-        for smiles in self.dataframe['CanonicalSmiles']:
+        for index, row in self.dataframe.iterrows():
+            smiles = row['CanonicalSmiles']
             descriptor = self.calculate_molecular_descriptors(smiles)
             if descriptor is not None:
                 descriptors.append(descriptor)
-            # Aggiorna la barra di avanzamento
-            progress_bar.update(1)
+            else:
+                rows_to_remove.append(index)
 
-        # Chiudi la barra di avanzamento
-        progress_bar.close()
-
-        # Crea il DataFrame dai descrittori
+        self.dataframe.drop(rows_to_remove, inplace=True)
         descriptors_df = pd.DataFrame(descriptors)
+        self.dataframe = self.dataframe.reset_index(drop=True)
 
-        # Unisci il DataFrame dei descrittori con il DataFrame originale
         self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
 
     def GetDFwithDescriptors(self):
