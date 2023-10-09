@@ -95,5 +95,4 @@ class FetchDescriptors:
 
     def GetDFwithDescriptors(self):
         self.dataframe.dropna(subset=['ROMol'], inplace=True)
-        print(self.dataframe.head())
         return self.dataframe

@@ -56,8 +56,6 @@ def ProcessDF(df, qq, p_FPmol):
         print("\nCreating descriptors...")
         dfWithDesc.CreateDescriptors()
         df_wd = dfWithDesc.GetDFwithDescriptors()
-        print("OK TEST")
-        print(df_wd.head())
         finaldf = Finder(p_FPmol, df_wd)
         result = finaldf.getDFwithFP()
 
@@ -103,7 +101,7 @@ def main():
         results = []
         batch = 0
         with Pool() as p:
-            for df in pd.read_csv(Database, sep=None, chunksize=100, engine='python'):
+            for df in pd.read_csv(Database, sep=None, chunksize=100000, engine='python'):
                 results.append(p.apply_async(ProcessDF, args=(df, q, FPmol,)))
             for result in results:
                 result.wait()
@@ -114,28 +112,33 @@ def main():
             p.terminate()
             p.join()
 
-        df2 = pd.concat(_df for _df in df_list if len(_df) != 0)
-        df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+        for idx , df in enumerate(df_list):
+            # df2 = pd.concat([_df for _df in df_list if len(_df) != 0], axis=1, ignore_index=True)
+            df.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
 
-        print("\nTotal number of compounds found: ", df2.shape[0])
-        ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
-        ultimateDF = ultimateDF.iloc[sliceStart:sliceEnd]
-        UltimateIDCol = [uCol for uCol in ultimateDF.columns if "id" in uCol.lower()][0]
+            print("\nTotal number of compounds found: ", df.shape[0])
+            ultimateDF = df.sort_values(['similarity'], ascending=Sort)
+            ultimateDF = ultimateDF.iloc[sliceStart:sliceEnd]
+            UltimateIDCol = [uCol for uCol in ultimateDF.columns if "id" in uCol.lower()][0]
 
-        try:
-            PandasTools.SaveXlsxFromFrame(ultimateDF.head(output),
-                                          f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx',
-                                          molCol='ROMol')
-            dfCSV = pd.DataFrame({'id': ultimateDF[UltimateIDCol], 'smiles': ultimateDF['CanonicalSmiles']})
-            dfCSV.head(output).to_csv(f'{FingerPrint.replace(".pdb", "")}_{Database}', index=False)
-        except:
-            raise Exception("DataFrame must not be empty")
+            try:
+                PandasTools.SaveXlsxFromFrame(ultimateDF.head(output),
+                                              f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}_{idx}.xlsx',
+                                              molCol='ROMol')
+                dfCSV = pd.DataFrame({'id': ultimateDF[UltimateIDCol], 'smiles': ultimateDF['CanonicalSmiles']})
+                dfCSV.head(output).to_csv(f'{FingerPrint.replace(".pdb", "")}_{Database}_{idx}', index=False)
+            except:
+                raise Exception("DataFrame must not be empty")
     except pd.errors.ParserError:
         print("Couldn't parse your database. Check if your db has the id and smiles columns")
 
 
 if __name__ == '__main__':
     start = time.perf_counter()
-    main()
-    finish = time.perf_counter()
-    print("Filtering completed in:", (finish - start))
+    try:
+        main()
+    except Exception as e:
+        print("Error during exec:", str(e))
+    finally:
+        finish = time.perf_counter()
+        print("Completed in: ", (finish - start))
