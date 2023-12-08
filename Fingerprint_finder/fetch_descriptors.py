@@ -1,22 +1,42 @@
 import traceback
+import tqdm
 from rdkit import Chem
-from rdkit.Chem import PandasTools
-
+from rdkit.Chem import Descriptors, PandasTools, Fragments
 import pandas as pd
-from tqdm import tqdm
 
 
 class FetchDescriptors:
-    def __init__(self, dataframe, excludes):
+    def __init__(self, dataframe=None):
         self.dataframe = dataframe
-        self.excludes = excludes
-        self.mols = [Chem.MolFromSmiles(i) for i in dataframe['CanonicalSmiles']]
-        PandasTools.AddMoleculeColumnToFrame(dataframe, smilesCol='CanonicalSmiles')
+        if dataframe is not None:
+            PandasTools.AddMoleculeColumnToFrame(dataframe, smilesCol='CanonicalSmiles')
 
     @staticmethod
     def calculate_molecular_descriptors(smiles):
+        descriptors = {}
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        else:
+            descriptors['molecular_weight'] = Descriptors.MolWt(mol)
+            descriptors['formal_charge'] = Chem.GetFormalCharge(mol)
+            descriptors['NumHAcceptors'] = Descriptors.NumHAcceptors(mol)
+            descriptors['NumHDonors'] = Descriptors.NumHDonors(mol)
+            descriptors['TPSA'] = Descriptors.TPSA(mol)
+            descriptors['NumHeteroatoms'] = Descriptors.NumHeteroatoms(mol)
+            descriptors['NumRotatableBonds'] = Descriptors.NumRotatableBonds(mol)
+            return descriptors
+
+    def CreateDescriptors(self):
+        descriptors_list = self.dataframe['CanonicalSmiles'].apply(self.calculate_molecular_descriptors)
+        descriptors_df = pd.DataFrame(descriptors_list.tolist())
+        self.dataframe = self.dataframe.reset_index(drop=True)
+        self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
+
+    @staticmethod
+    def RemoveToxicAndCreate3D(smiles):
         from rdkit import Chem
-        from rdkit.Chem import Descriptors, Fragments, AllChem, Descriptors3D
+        from rdkit.Chem import Fragments, AllChem, Descriptors3D
         from rdkit import RDLogger
         RDLogger.DisableLog('rdApp.*')
         public_method_names = [method for method in dir(Descriptors3D) if callable(getattr(Descriptors3D, method)) if
@@ -66,33 +86,27 @@ class FetchDescriptors:
                 method = getattr(Descriptors3D, method_name)
                 result = method(mol)
                 descriptors[method_name] = result
-            descriptors['molecular_weight'] = Descriptors.MolWt(mol)
-            descriptors['formal_charge'] = Chem.GetFormalCharge(mol)
-            descriptors['NumHAcceptors'] = Descriptors.NumHAcceptors(mol)
-            descriptors['NumHDonors'] = Descriptors.NumHDonors(mol)
-            descriptors['TPSA'] = Descriptors.TPSA(mol)
-            descriptors['NumHeteroatoms'] = Descriptors.NumHeteroatoms(mol)
-            descriptors['NumRotatableBonds'] = Descriptors.NumRotatableBonds(mol)
         return descriptors
 
-    def CreateDescriptors(self):
+    def Get3DDescriptors(self, preFinalDf):
         descriptors = []
         rows_to_remove = []
-
-        for index, row in self.dataframe.iterrows():
+        for index, row in preFinalDf.iterrows():
             smiles = row['CanonicalSmiles']
-            descriptor = self.calculate_molecular_descriptors(smiles)
-            if descriptor is not None:
-                descriptors.append(descriptor)
-            else:
-                rows_to_remove.append(index)
+            try:
+                descriptor = self.RemoveToxicAndCreate3D(smiles)
+                if descriptor is not None:
+                    descriptors.append(descriptor)
+                else:
+                    rows_to_remove.append(index)
+            except Exception as e:
+                print(f"Error processing row {index}: {e}")
 
-        self.dataframe.drop(rows_to_remove, inplace=True)
+        preFinalDf.drop(rows_to_remove, inplace=True)
         descriptors_df = pd.DataFrame(descriptors)
-        self.dataframe = self.dataframe.reset_index(drop=True)
-
-        self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
+        finalDF = pd.concat([preFinalDf.reset_index(drop=True), descriptors_df.reset_index(drop=True)], axis=1)
+        return finalDF
 
     def GetDFwithDescriptors(self):
-        self.dataframe.dropna(subset=['ROMol'], inplace=True)
+        print(self.dataframe.head())
         return self.dataframe

@@ -24,7 +24,7 @@ def ProcessDF(df, qq, p_FPmol):
             if ex_string == '+':
                 ex_string = '\\+'
             df = df[~df['smiles'].str.contains(ex_string)]
-            print("\nAfter excluding: ", ex_string)
+            print("\nAfter exclusion:")
             print(df.shape)
     if includes is not None:
         for in_string in includes:
@@ -51,41 +51,37 @@ def ProcessDF(df, qq, p_FPmol):
                 "Wrong separator or database format. Try to define a different separator with -se or check your database format ['id', 'smiles']")
             exit()
         filteredDF = filtered.getFiltered()
-        print("\nAdding molecular descriptors...")
-        dfWithDesc = FetchDescriptors(filteredDF, excludes)
-        print("\nCreating descriptors...")
+        print("Adding molecular descriptors...")
+        dfWithDesc = FetchDescriptors(filteredDF)
+        print("Creating descriptors...")
         dfWithDesc.CreateDescriptors()
         df_wd = dfWithDesc.GetDFwithDescriptors()
         finaldf = Finder(p_FPmol, df_wd)
         result = finaldf.getDFwithFP()
-
         result2 = result.copy()
-        if len(filters) != 0:
-            for _f in filters:
-                print("Filtering:", _f)
-                _filter = _f.split()
-                if str(_filter[0]).startswith('simi'):
-                    column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
-                elif str(_filter[0]).startswith('for'):
-                    column, operator, criterium = _filter[0], _filter[1], int(_filter[2])
-                else:
-                    column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
+        for _f in filters:
+            print("Filtering:", _f)
+            _filter = _f.split()
+            if str(_filter[0]).startswith('simi'):
+                column, operator, criterium = _filter[0], _filter[1], float(_filter[2]) / 100
+            elif str(_filter[0]).startswith('for'):
+                column, operator, criterium = _filter[0], _filter[1], int(_filter[2])
+            else:
+                column, operator, criterium = _filter[0], _filter[1], float(_filter[2])
 
-                if operator == '==' or operator == "=":
-                    filterQuery = f"{column} == {criterium}"
-                if operator == '>=':
-                    filterQuery = f"{column} >= {criterium}"
-                if operator == '<=':
-                    filterQuery = f"{column} <= {criterium}"
-                if operator == '<':
-                    filterQuery = f"{column} < {criterium}"
-                if operator == '>':
-                    filterQuery = f"{column} > {criterium}"
-                result2 = result2.copy().query(filterQuery)
-            result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
-        print("\nAdding filtered dataframe to queue:")
+            if operator == '==' or operator == "=":
+                filterQuery = f"{column} == {criterium}"
+            if operator == '>=':
+                filterQuery = f"{column} >= {criterium}"
+            if operator == '<=':
+                filterQuery = f"{column} <= {criterium}"
+            if operator == '<':
+                filterQuery = f"{column} < {criterium}"
+            if operator == '>':
+                filterQuery = f"{column} > {criterium}"
+            result2 = result2.copy().query(filterQuery)
+        result2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
         print(result2.head())
-        print('\n')
         qq.put(result2)
     else:
         qq.put(pd.DataFrame())
@@ -111,34 +107,33 @@ def main():
             p.close()
             p.terminate()
             p.join()
-
-        for idx , df in enumerate(df_list):
-            # df2 = pd.concat([_df for _df in df_list if len(_df) != 0], axis=1, ignore_index=True)
-            df.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
-
-            print("\nTotal number of compounds found: ", df.shape[0])
-            ultimateDF = df.sort_values(['similarity'], ascending=Sort)
-            ultimateDF = ultimateDF.iloc[sliceStart:sliceEnd]
-            UltimateIDCol = [uCol for uCol in ultimateDF.columns if "id" in uCol.lower()][0]
-
-            try:
-                PandasTools.SaveXlsxFromFrame(ultimateDF.head(output),
-                                              f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}_{idx}.xlsx',
-                                              molCol='ROMol')
-                dfCSV = pd.DataFrame({'id': ultimateDF[UltimateIDCol], 'smiles': ultimateDF['CanonicalSmiles']})
-                dfCSV.head(output).to_csv(f'{FingerPrint.replace(".pdb", "")}_{Database}_{idx}', index=False)
-            except:
-                raise Exception("DataFrame must not be empty")
     except pd.errors.ParserError:
         print("Couldn't parse your database. Check if your db has the id and smiles columns")
+
+    try:
+        df2 = pd.concat(_df for _df in df_list if len(_df) != 0)
+    except:
+        print("No compound is matching your criteria. Please change selection criteria and rerun.")
+        exit()
+    df2 = df2.iloc[sliceStart:sliceEnd]
+    df2.drop_duplicates(subset=['CanonicalSmiles'], inplace=True)
+    ultimateDF = df2.sort_values(['similarity'], ascending=Sort)
+    finalFilter = FetchDescriptors()
+    finalDf = finalFilter.Get3DDescriptors(ultimateDF)
+    UltimateIDCol = [uCol for uCol in finalDf.columns if "id" in uCol.lower()][0]
+
+    try:
+        PandasTools.SaveXlsxFromFrame(finalDf.head(output),
+                                      f'{FingerPrint.replace(".pdb", "")}_{Database.replace(".smi", "")}.xlsx',
+                                      molCol='ROMol')
+        dfCSV = pd.DataFrame({'id': finalDf[UltimateIDCol], 'smiles': finalDf['CanonicalSmiles']})
+        dfCSV.head(output).to_csv(f'{FingerPrint.replace(".pdb", "")}_{Database}', index=False)
+    except:
+        raise Exception("DataFrame must not be empty")
 
 
 if __name__ == '__main__':
     start = time.perf_counter()
-    try:
-        main()
-    except Exception as e:
-        print("Error during exec:", str(e))
-    finally:
-        finish = time.perf_counter()
-        print("Completed in: ", (finish - start))
+    main()
+    finish = time.perf_counter()
+    print("Filtering completed in:", (finish - start))
