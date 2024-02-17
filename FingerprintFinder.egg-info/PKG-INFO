@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: FingerprintFinder
-Version: 2.4.3
-Summary: Takes one pdb, a .smi database, finds and stores a set of similar fingerprints in an excel files
-Author: Ludovico Pipitò
-Author-email: pipitol@uni.coventry.ac.uk
-Requires-Python: >=3.6.6

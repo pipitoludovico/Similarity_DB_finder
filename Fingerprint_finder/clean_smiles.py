@@ -7,12 +7,12 @@ class SmilesCleaner:
         self.molObjs = []
         self.canonicalSmiles = []
 
-    def getCanonicalSmiles(self):
-        print("Removing stereochemistry and rewriting the SMILES in canonical form...")
+    def getCanonicalSmiles(self, stereo=True):
         try:
             self.molObjs = [Chem.MolFromSmiles(smi) for smi in self.smiles]
-            for mol in self.molObjs:
-                Chem.RemoveStereochemistry(mol)
+            if stereo is False:
+                for mol in self.molObjs:
+                    Chem.RemoveStereochemistry(mol)
             self.canonicalSmiles = [Chem.MolToSmiles(mol) for mol in self.molObjs]
 
         except Exception as e:

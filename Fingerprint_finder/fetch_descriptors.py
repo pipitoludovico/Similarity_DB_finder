@@ -1,15 +1,15 @@
 import traceback
-import tqdm
 from rdkit import Chem
-from rdkit.Chem import Descriptors, PandasTools, Fragments
+from rdkit.Chem import Descriptors, PandasTools
 import pandas as pd
 
 
 class FetchDescriptors:
-    def __init__(self, dataframe=None):
+    def __init__(self, dataframe=None, toxicFlag=None):
         self.dataframe = dataframe
         if dataframe is not None:
             PandasTools.AddMoleculeColumnToFrame(dataframe, smilesCol='CanonicalSmiles')
+        self.toxicFlag = toxicFlag
 
     @staticmethod
     def calculate_molecular_descriptors(smiles):
@@ -33,8 +33,7 @@ class FetchDescriptors:
         self.dataframe = self.dataframe.reset_index(drop=True)
         self.dataframe = pd.concat([self.dataframe, descriptors_df], axis=1)
 
-    @staticmethod
-    def RemoveToxicAndCreate3D(smiles):
+    def RemoveToxicAndCreate3D(self, smiles):
         from rdkit import Chem
         from rdkit.Chem import Fragments, AllChem, Descriptors3D
         from rdkit import RDLogger
@@ -47,35 +46,38 @@ class FetchDescriptors:
         if mol is None:
             print("mol failed")
             return None
-        try:
-            toxicFrag['Esters'] = Chem.Fragments.fr_ester(mol)
-            toxicFrag['Ar-NH2'] = Chem.Fragments.fr_Ar_NH(mol)
-            toxicFrag["IdroxilAmmine"] = Chem.Fragments.fr_N_O(mol)
-            toxicFrag['Thiol'] = Chem.Fragments.fr_SH(mol)
-            toxicFrag['Alehydes'] = Chem.Fragments.fr_aldehyde(mol)
-            toxicFrag['Carbammate'] = Chem.Fragments.fr_alkyl_carbamate(mol)
-            toxicFrag['Allylic Ox'] = Chem.Fragments.fr_allylic_oxid(mol)
-            toxicFrag["Azide"] = Chem.Fragments.fr_azide(mol)
-            toxicFrag['Azo'] = Chem.Fragments.fr_azo(mol)
-            toxicFrag['DiAzo'] = Chem.Fragments.fr_diazo(mol)
-            toxicFrag['Alkyl_allide'] = Chem.Fragments.fr_alkyl_halide(mol)
-            toxicFrag['Epoxide'] = Chem.Fragments.fr_epoxide(mol)
-            toxicFrag['Furan'] = Chem.Fragments.fr_furan(mol)
-            toxicFrag['Hydrazine'] = Chem.Fragments.fr_hdrzine(mol)
-            toxicFrag['Hydrazone'] = Chem.Fragments.fr_hdrzone(mol)
-            toxicFrag['Isocyanates'] = Chem.Fragments.fr_isocyan(mol)
-            toxicFrag['IsoThioCyanates'] = Chem.Fragments.fr_isothiocyan(mol)
-            toxicFrag['Nitriles'] = Chem.Fragments.fr_nitrile(mol)
-            toxicFrag['Nitro'] = Chem.Fragments.fr_nitro(mol)
-            toxicFrag['NitroBenzAromatic'] = Chem.Fragments.fr_nitro_arom(mol)
-            toxicFrag['NonOrthtoNitroBenz'] = Chem.Fragments.fr_nitro_arom_nonortho(mol)
-            toxicFrag['NO2'] = Chem.Fragments.fr_nitroso(mol)
-            toxicFrag['Oxime'] = Chem.Fragments.fr_oxime(mol)
-            toxicFrag['ThyoCyanate'] = Chem.Fragments.fr_thiocyan(mol)
-        except Exception:
-            print(traceback.format_exc())
+        if self.toxicFlag is True:
+            print("Removing toxic fragments from database...")
+            try:
+                toxicFrag['Esters'] = Chem.Fragments.fr_ester(mol)
+                toxicFrag['Ar-NH2'] = Chem.Fragments.fr_Ar_NH(mol)
+                toxicFrag["IdroxilAmmine"] = Chem.Fragments.fr_N_O(mol)
+                toxicFrag['Thiol'] = Chem.Fragments.fr_SH(mol)
+                toxicFrag['Alehydes'] = Chem.Fragments.fr_aldehyde(mol)
+                toxicFrag['Carbammate'] = Chem.Fragments.fr_alkyl_carbamate(mol)
+                toxicFrag['Allylic Ox'] = Chem.Fragments.fr_allylic_oxid(mol)
+                toxicFrag["Azide"] = Chem.Fragments.fr_azide(mol)
+                toxicFrag['Azo'] = Chem.Fragments.fr_azo(mol)
+                toxicFrag['DiAzo'] = Chem.Fragments.fr_diazo(mol)
+                toxicFrag['Alkyl_allide'] = Chem.Fragments.fr_alkyl_halide(mol)
+                toxicFrag['Epoxide'] = Chem.Fragments.fr_epoxide(mol)
+                toxicFrag['Furan'] = Chem.Fragments.fr_furan(mol)
+                toxicFrag['Hydrazine'] = Chem.Fragments.fr_hdrzine(mol)
+                toxicFrag['Hydrazone'] = Chem.Fragments.fr_hdrzone(mol)
+                toxicFrag['Isocyanates'] = Chem.Fragments.fr_isocyan(mol)
+                toxicFrag['IsoThioCyanates'] = Chem.Fragments.fr_isothiocyan(mol)
+                toxicFrag['Nitriles'] = Chem.Fragments.fr_nitrile(mol)
+                toxicFrag['Nitro'] = Chem.Fragments.fr_nitro(mol)
+                toxicFrag['NitroBenzAromatic'] = Chem.Fragments.fr_nitro_arom(mol)
+                toxicFrag['NonOrthtoNitroBenz'] = Chem.Fragments.fr_nitro_arom_nonortho(mol)
+                toxicFrag['NO2'] = Chem.Fragments.fr_nitroso(mol)
+                toxicFrag['Oxime'] = Chem.Fragments.fr_oxime(mol)
+                toxicFrag['ThyoCyanate'] = Chem.Fragments.fr_thiocyan(mol)
+            except Exception:
+                print(traceback.format_exc())
         if any(value >= 1 for value in toxicFrag.values()):
             return None
+
         try:
             AllChem.EmbedMolecule(mol, useExpTorsionAnglePrefs=True, useBasicKnowledge=True)
             embed_success = True
@@ -108,5 +110,4 @@ class FetchDescriptors:
         return finalDF
 
     def GetDFwithDescriptors(self):
-        print(self.dataframe.head())
         return self.dataframe

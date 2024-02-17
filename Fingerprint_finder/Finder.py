@@ -6,15 +6,16 @@ class Finder:
 
     def __init__(self, ref=None, df=None):
         self.finalDF = None
-        self.FP2 = FingerprintMols.FingerprintMol(ref, minPath=1, maxPath=7, fpSize=2048,
-                                                  bitsPerHash=2, useHs=False, tgtDensity=0.0,
-                                                  minSize=128)
-        self.DBfingerPrints = [FingerprintMols.FingerprintMol(x, minPath=1, maxPath=7, fpSize=2048,
-                                                              bitsPerHash=2, useHs=False, tgtDensity=0.0,
+        self.reference = FingerprintMols.FingerprintMol(ref, minPath=1, maxPath=8, fpSize=512,
+                                                        bitsPerHash=2, useHs=True, tgtDensity=0.05,
+                                                        minSize=128)
+        self.DBfingerPrints = [FingerprintMols.FingerprintMol(x, minPath=1, maxPath=8, fpSize=512,
+                                                              bitsPerHash=2, useHs=True, tgtDensity=0.05,
                                                               minSize=128) for x in df['ROMol']]
-        self.similarities2 = [DataStructs.FingerprintSimilarity(self.FP2, fp) for fp in self.DBfingerPrints]
+
+        self.similarities = [DataStructs.FingerprintSimilarity(self.reference, fp) for fp in self.DBfingerPrints]
         df_copy = df.copy()  # Create a copy of the DataFrame
-        df_copy['similarity'] = self.similarities2
+        df_copy['similarity'] = self.similarities
         self.finalDF = df_copy.sort_values(['similarity'], ascending=False)
 
     def getDFwithFP(self):
