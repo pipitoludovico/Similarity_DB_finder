@@ -52,7 +52,7 @@ def ProcessDF(df, qq, p_FPmol, idx):
         df2['CanonicalSmiles'] = canonicalSmiles
 
         try:
-            log.write("Now dropping duplicates from the dataframe...\n")
+            log.write("Now dropping duplicates from the dataframe.\n")
             filtered = Filter(df2, idColName)
         except Exception as e:
             print(e)
